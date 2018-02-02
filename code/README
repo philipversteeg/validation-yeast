@@ -1,0 +1,57 @@
+Package to compute several methods for predicting a causal effect
+--------
+
+Files and folders organization:
+- groundtruth
+	methods for validating a causal effect
+- prediction
+	methods for predicting a causal effect
+- libs
+	various classes and methods used throughout
+- config.py 
+	setup of local folders and files
+- compare_prediction_grountruth.py 
+	class for efficiently comparing predictions and groundtruths
+- microarraydata.py
+	data classes: Hughes 2000, Kemmeren 2014 and simulations
+- requirements.txt 	
+	python dependencies
+
+Predictions
+--------
+Idea: 
+There is an underlying abstract-base class for each method with shared computational 
+parameters and per-task options. The fit method that returns a fitted CausalArray needs 
+to be overriden in each inherited subclass. Additionally R scripts are easily callable 
+for specific algorithms available in R packages.
+
+Compute:
+* Calling the fit method directly on an instance
+* Embarassingly parallel by the included Pool class wihtin python
+* Using GNU PARALLEL or SLURM via command line scripts
+
+Groundtruths
+--------
+We distinguish internal groundtruths, that are computed from interventional data, and
+external groundtruths, that are other datasets or domain sources
+
+Internal groundtruths:
+- Absolute value (abs)
+- Absolute value normalized (abs.norm)
+- Relative value (rel)
+- Relative value normalized (rel.norm)
+- IDA norm (ida, source: Maathuis 2009)
+- Strong Intervention Effects (sie Meinshausen 2016)
+
+External groundtruths
+- MacIsaac data (MacIsaac 2006)
+- Saccharomyces Genome Database (sgd) (Cherry 2012)
+
+References
+--------
+Hughes 2000 "Functional discovery via a compendium of expression profiles"
+Kemmeren 2014 "Large-scale genetic perturbations reveal regulatory networks and an abundance of gene-specific repressors"
+Cherry 2012 "Saccharomyces Genome Database: the genomics resource of budding yeast"
+MacIsaac 2006 "An improved map of conserved regulatory sites for Saccharomyces cerevisiae"
+Maathuis 2009 "Estimating high-dimensional intervention effects from observational data"
+Meinshausen 2016 "Methods for causal inference from gene perturbation experiments and validation"

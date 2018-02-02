@@ -1,0 +1,67 @@
+1c1,6
+< """Metrics to assess performance on classification task given scores
+---
+> """
+> Philip:
+>     adapted sklearn.metrics.ranking with
+>     parial auc from https://github.com/scikit-learn/scikit-learn/pull/3840.
+> 
+> Metrics to assess performance on classification task given scores
+26,37c31,40
+< from ..utils import assert_all_finite
+< from ..utils import check_consistent_length
+< from ..utils import column_or_1d, check_array
+< from ..utils.multiclass import type_of_target
+< from ..utils.extmath import stable_cumsum
+< from ..utils.fixes import bincount
+< from ..utils.fixes import array_equal
+< from ..utils.stats import rankdata
+< from ..utils.sparsefuncs import count_nonzero
+< from ..exceptions import UndefinedMetricWarning
+< 
+< from .base import _average_binary_score
+---
+> from sklearn.utils import assert_all_finite
+> from sklearn.utils import check_consistent_length
+> from sklearn.utils import column_or_1d, check_array
+> from sklearn.utils.multiclass import type_of_target
+> from sklearn.utils.extmath import stable_cumsum
+> from sklearn.utils.fixes import bincount
+> from sklearn.utils.fixes import array_equal
+> from sklearn.utils.stats import rankdata
+> from sklearn.utils.sparsefuncs import count_nonzero
+> from sklearn.exceptions import UndefinedMetricWarning
+38a42
+> from sklearn.metrics.base import _average_binary_score
+187c191,192
+< def roc_auc_score(y_true, y_score, average="macro", sample_weight=None):
+---
+> def roc_auc_score(y_true, y_score, average="macro", sample_weight=None, 
+>                   max_fpr=None):
+223a229,232
+>     max_fpr : float, optional
+>        If not ``None``, the standardized partial AUC over
+>        the range [0, max_fpr] is returned.
+> 
+232a242,244
+>     .. [2] `Analyzing a portion of the ROC curve. McClish, 1989
+>             <http://www.ncbi.nlm.nih.gov/pubmed/2668680>`_
+> 
+255a268,284
+>         if max_fpr:
+>             idx = np.where(fpr <= max_fpr)[0]
+> 
+>             # linearly interpolate the ROC curve until max_fpr
+>             idx_last = idx.max()
+>             idx_next = idx_last + 1
+>             xc = [fpr[idx_last], fpr[idx_next]]
+>             yc = [tpr[idx_last], tpr[idx_next]]
+>             tpr = np.r_[tpr[idx], np.interp(max_fpr, xc, yc)]
+>             fpr = np.r_[fpr[idx], max_fpr]
+>             partial_roc = auc(fpr, tpr, reorder=True)
+> 
+>             # standardize result to lie between 0.5 and 1
+>             min_area = max_fpr**2/2
+>             max_area = max_fpr
+>             return 0.5*(1+(partial_roc-min_area)/(max_area-min_area))
+> 

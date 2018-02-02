@@ -1,0 +1,50 @@
+# Latex output
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.sty
+*.cls
+*.fls
+*.bcf
+*.xml
+
+# Python
+*.pyc
+*.ipynb
+*.ipynb_checkpoints*
+
+# R
+*.Rhistory
+
+# Binaries
+*.pdf
+*.hdf5
+*.RData
+*.pkl
+*.npz
+
+# Images
+*.jpg
+*.png
+
+# Mac
+.DS_Store
+Icon\r
+Icon^M
+
+# Misc
+*.zip
+*.ini
+*.dropbox
+
+# Log output
+*__stdout__*
+*__stderr__*
+
