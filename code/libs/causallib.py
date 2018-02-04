@@ -1,34 +1,40 @@
+"""Asymmetric objects with distinct 'cause' and 'effect' dimensions.
+
+* CausalArray
+* UnitsOfMeasure
+"""
 import numpy as np
 import h5py
 import os
 import copy
 
 class CausalArray(object):
-    """docstring for CausalArray object
+    """Derived numpy.ndarray with distinct 'cause' and 'effect' dimensions.
     
     Attributes:
-        array (TYPE): Description
-        causes (TYPE): Description
-        effects (TYPE): Description
-        file (TYPE): Description
-        name (TYPE): Description
-        threshold (TYPE): Description
-        units (string): UnitsOfMeasure instance.
+        array (numpy.ndarray): Array of cause x effect dimensions
+        causes (list): List of unique causes corresponding to array
+        effects (list): List of unique effects corresponding to array
+        file (str): Location of saved version on disk
+        name (str): Name
+        pretty_name (str): Printable name
+        threshold (int): Cutoff value used for thresholding a continuous array
+        units (UnitsOfMeasure): UnitsOfMeasure instance
     """
     _default_name = 'causalarray'
 
     def __init__(self, array, causes, effects=None, mask=None, remove_self_loops=None, units=None, file=None, name=None, sort=False):
-        """Summary
+        """Derived numpy.ndarray with distinct 'cause' and 'effect' dimensions.
         
         Args:
-            array (TYPE): Description
-            causes (TYPE): Description
-            effects (None, optional): Description
-            mask (None, optional): Description
-            remove_self_loops (None, optional): Description
+            array (numpy.ndarray): Array of cause x effect dimensions
+            causes (list): List of unique causes corresponding to array
+            effects (list, optional): List of unique effects corresponding to array, if None copy the causes
+            mask (numpy.ndarray, optional): Array used to mask invalued entries of array
+            remove_self_loops (bool, optional): Mask away the diagonal entries
             units (None, optional): UnitsOfMeasure object or create one by UnitsOfMeasure(units), default of None corresponds to 'unset'.
-            file (None, optional): Description
-            name (None, optional): Description
+            file (str, optional): Location of saved version on disk
+            name (str, optional): Name
         """
         assert issubclass(type(array), np.ndarray)
         assert issubclass(type(causes), list) # set won't do, unordered... Enforce unique list!

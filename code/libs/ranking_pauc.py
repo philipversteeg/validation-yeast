@@ -1,7 +1,5 @@
 """
-Philip:
-    adapted sklearn.metrics.ranking with
-    parial auc from https://github.com/scikit-learn/scikit-learn/pull/3840.
+Adapted from sklearn.metrics.ranking with parial auc fix from https://github.com/scikit-learn/scikit-learn/pull/3840.
 
 Metrics to assess performance on classification task given scores
 

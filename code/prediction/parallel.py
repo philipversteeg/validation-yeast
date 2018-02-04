@@ -1,3 +1,4 @@
+"""Classes and methods to run predictions in parallel."""
 # stdlib
 import os
 import math
@@ -213,13 +214,13 @@ class Pool(object):
 
 
 #############################
-#   Slurm                   #
+#   Fit from file           #
 #############################
 def fit_from_files(task_file, data_file, verbose=True):
-    """Fit a prediction task using saved task and data files"""
+    """Fit a prediction task using previously saved task file and data file"""
     print_fitting_time = 1
 
-    if verbose: print '[SlurmFit] Called with \n\ttask: {}\n\tdata: {}'.format(task_file, data_file)
+    if verbose: print '[FitFromFile] Called with \n\ttask: {}\n\tdata: {}'.format(task_file, data_file)
     assert os.path.exists(task_file)
     assert os.path.exists(data_file)
 
@@ -227,11 +228,11 @@ def fit_from_files(task_file, data_file, verbose=True):
     data = MicroArrayData.load(data_file)
 
     start_time = time.time()
-    if verbose: print '[SlurmFit] Fitting {task.name} on {data.name}..'.format(task=task, data=data)
+    if verbose: print '[FitFromFile] Fitting {task.name} on {data.name}..'.format(task=task, data=data)
 
     task.fit(data)
 
     print_count = 1
     if int((time.time() - start_time) / print_fitting_time) > print_count and verbose >= 1:
-        print '[SlurmFit][{:02d}h{:02d}m] running:'.format(*divmod(print_count*10, 60)),
+        print '[FitFromFile][{:02d}h{:02d}m] running:'.format(*divmod(print_count*10, 60)),
         print_count += 1

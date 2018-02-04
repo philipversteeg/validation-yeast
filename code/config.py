@@ -1,11 +1,15 @@
-""" Package settings file"""
+"""Settings singleton file."""
 import os
 
-## Settings 
-_name = 'Prediction'                                            # printable name
+## General Settings 
+_name = 'CompPredGt'                                            # printable name
 verbose = 1                                                     # default global level of print output
-server = os.sys.platform != 'darwin'                            # true if on linux or windows
-save_task_threshold= 10.                                        # for each prediction task, a
+server = os.sys.platform != 'darwin'                            # by default, true if on linux or windows
+
+## Prediction
+save_task_threshold = 10.                                       # for each prediction task, a
+
+## Groundtruth
 
 ## Package folders
 _folder_package = os.path.abspath(os.path.dirname(__file__))    # package folder

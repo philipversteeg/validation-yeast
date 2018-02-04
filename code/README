@@ -1,4 +1,5 @@
-Package to compute several methods for predicting a causal effect
+Package to compute several methods for predicting and validating causal effects 
+in gene expression microarraydata.
 --------
 
 Files and folders organization:

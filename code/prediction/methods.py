@@ -1,3 +1,7 @@
+"""Methods that predict a causal effect.
+
+Instantiate class and call fit method.
+"""
 # stdlib
 import os
 import time
@@ -496,19 +500,6 @@ class Glasso(ObservationalMethod, CallRMethod):
         script = 'ComputeGlasso.R'
         pars = ['method={}'.format('mb' if self.mbapprox else 'glasso')]
         return np.abs(self.run_rscript(x=x, script=script, pars=pars)), self.unitstring
-
-
-### old ridge class..
-# class Ridge(ObservationalMethod):
-
-    # def __init__(self, fix_lambda, *args, **kwargs):
-    #     super(Ridge, self).__init__(*args, **kwargs)
-    #     self.fix_lambda = fix_lambda
-                    
-    # def _fit_simple(self, x):
-    #     script = 'ComputeRidgeCV.R'
-    #     pars = ['fix.lambda.after={}'.format(self.fix_lambda)]
-    #     return np.abs(self.run_rscript(x=x, script=script, pars=pars))
 
 
 class ElasticNet(ObservationalMethod, MultiProcess, CallRMethod):
