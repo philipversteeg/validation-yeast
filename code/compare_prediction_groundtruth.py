@@ -82,65 +82,6 @@ def compute_one_bootstrap(p, g, max_fpr):
     # print 'Done in {:.2f}s.'.format(time.time() - _start_bootstrap) 
     return score
 
-def autoscale_y(ax=None,margin=0.1):
-    """This function rescales the y-axis based on the data that is visible given the current xlim of the axis.
-    ax -- a matplotlib axes object
-    margin -- the fraction of the total height of the y-data to pad the upper and lower ylims
-
-    source: https://stackoverflow.com/questions/29461608/matplotlib-fixing-x-axis-scale-and-autoscale-y-axis
-    """
-
-    # def get_bottom_top(line):
-    #     xd = line.get_xdata()
-    #     yd = line.get_ydata()
-    #     lo,hi = ax.get_xlim()
-    #     y_displayed = yd[((xd>lo) & (xd<hi))]
-    #     h = np.max(y_displayed) - np.min(y_displayed)
-    #     bot = np.min(y_displayed)-margin*h
-    #     top = np.max(y_displayed)+margin*h
-    #     return bot,top
-
-    # lines = ax.get_lines()
-    # bot,top = np.inf, -np.inf
-
-    # for line in lines:
-    #     try:
-    #         new_bot, new_top = get_bottom_top(line)
-    #         if new_bot < bot: bot = new_bot
-    #         if new_top > top: top = new_top
-    #     except:
-    #         pass
-
-    # if bot is not np.inf and top is not -np.inf:
-    #     ax.set_ylim(bot,top)
-
-    _start_time = time.time()
-    if ax is None: 
-        ax = plt.gca()
-
-    def get_top(line):
-        xd = line.get_xdata()
-        yd = line.get_ydata()
-        lo,hi = ax.get_xlim()
-        y_displayed = yd[((xd>lo) & (xd<hi))]
-        h = np.max(y_displayed) - np.min(y_displayed)
-        top = np.max(y_displayed)+margin*h
-        return top
-
-    lines = ax.get_lines()
-    top = -np.inf
-
-    for line in lines:
-        try:
-            new_top = get_top(line)
-            if new_top > top: top = new_top
-        except:
-            pass
-
-    if top is not -np.inf:
-        ax.set_ylim(0,top)
-    print 'Autoscaled y-axis in {:.2f} sec.'.format(time.time() - _start_time)
-
 
 class ComparePredictionGroundtruth(object):
     """Class used to compare multiple predictions against multiple groundtruths.
@@ -167,23 +108,22 @@ class ComparePredictionGroundtruth(object):
         without computing (part of) the mask dictionaries.
     
     Attributes:
-        default_max_fpr_list (list): Description
-        default_max_tpr_list (list): Description
-        default_thresholds (list): Description
-        linestyle_tpfp (str): Description
-        number_random_groundtruths (TYPE): number of randomly sampled groundtruths added
-        number_random_predictions (TYPE): number of randomly sampled predictions added
-        random_groundtruths (TYPE): Description
-        random_predictions (TYPE): Description
-        remove_self_loops (TYPE): Description
-        scale_units (TYPE): Description
-        settings_available (list): available comparison settings: 'pairwise' (default) compares
-        takes the subset of causes and effects in each (prediction, groundtruth) as the comparison
-        set; 'intersection' takes the intersection of all. The latter is faster and less memory 
+        default_max_fpr_list (list): default list of maximum FPR to plot
+        default_max_tpr_list (list): default list of maximum TPR to plot
+        default_thresholds (list): default list of thresholds
+        force_units_unknown (bool): option to force all 'unknown' units from predictions and threat them as a) the specified UnitsOfMeasure or unitstring, i.e. '1' or 'j' or b) 'match' to the compared unit
+        linestyle (str): linestyle of plots
+        number_random_groundtruths (int): number of randomly sampled groundtruths added
+        number_random_predictions (int): number of randomly sampled predictions added
+        remove_self_loops (bool): remove self loops from the comparison, i.e. A -> A excluded
+        scale_units (dict): if not none, should be a dict containing scale factors for all causes and effects
+        setting (str): comparison settings: 'pairwise' (default) takes the subset of causes and effects in each (prediction, groundtruth) as the comparison
+        settings_available (list): available comparison settings
+        set; 'intersection' takes the intersection of all. The latter is faster and less memory. 
         expensive.
-        symmetrize (TYPE): only causes
-        thresholds (TYPE): Description
-        verbose (TYPE): Description
+        symmetrize (bool): Take intersection of causes and effects
+        thresholds (list): list of top-percentiles that are taken as positives for computing binary groundtruths
+        verbose (bool): verbose flag
     """
     # default_thresholds = [5., 1.]
     default_thresholds = [90., 95.] # CHANGED THRESHOLD TO PERCENTILE
@@ -193,7 +133,6 @@ class ComparePredictionGroundtruth(object):
     settings_available = ['intersection', 'pairwise']
 
     # plot options
-    # linestyle_tpfp = ':' # doesnt work so wel for large sets...
     linestyle_tpfp = '-' # default solid line
 
     def __init__(self, 
@@ -207,7 +146,6 @@ class ComparePredictionGroundtruth(object):
                  number_random_groundtruths=5,      # number of randomly sampled groundtruths added
                  scale_units=None,                  # if not none, should be a dict containing scale factors for all causes and effects
                  force_units_unknown=None,          # extra option to force all 'unknown' units from predictions and threat them as a) the specified UnitsOfMeasure or unitstring, i.e. '1' or 'j' or b) 'match' to the compared unit.
-                 per_cause_or_effect=None,                          # setting this 'cause' or 'effect' will marginalize out the other part
                  verbose=True                       # verbose flag
                  ):
         super(ComparePredictionGroundtruth, self).__init__()
@@ -228,7 +166,6 @@ class ComparePredictionGroundtruth(object):
         self.verbose = verbose
         self._changed_dicts = True # flag that keeps track of changed dicts; need to do set of computations again if this is True.
         self._noscale_these = []    # temp list of pairs of identifiers to force a not scale.
-        self.per_cause_or_effect = per_cause_or_effect
         # assertions and exceptions
         assert scale_units is None or type(scale_units) is dict
         if self.setting not in COMPARE_SETTINGS: 
@@ -265,15 +202,6 @@ class ComparePredictionGroundtruth(object):
                 # assert issubclass(type(i), CausalArray)
                 # self._predictions[i.name] = i
         self._changed_dicts = True
-
-    @property
-    def per_cause_or_effect(self):
-        return self._per_cause_or_effect
-
-    @per_cause_or_effect.setter
-    def per_cause_or_effect(self, val):
-        assert val == 'cause' or val =='effect' or val is None
-        self._per_cause_or_effect = val
 
     def _compute_masks(self):
         """Internal method called to compute all masks 
@@ -583,48 +511,10 @@ class ComparePredictionGroundtruth(object):
         # construct masked versions
         p_ma, g_ma = np.ma.MaskedArray(p_array, mask=p_mask), np.ma.MaskedArray(g_array, mask=g_mask)
         
-        # marginalize out effects or causes
-        if self.per_cause_or_effect is not None:
-            pass
-            # if self.per_cause_or_effect == 'cause':
-            #     p_ma = p_ma.sum(axis=1) /  # per cause implies marginalizing over all effects, i.e. summing over all columns
-            #     g_array = g_array.sum(axis=1) # what to do with this?
-            # if self.per_cause_or_effect == 'effect':
-
         if flatten:
             return p_ma.compressed(), g_ma.compressed()
         else:
             return p_ma, g_ma
-
-    @update_mask
-    def compute_fp_tp_old(self, p, pred, g, gt, max_indices=None, randomize_ties=True):
-        """Compute (fp, tp) for two CausalArrays."""
-        if self.verbose > 1: _start_time = time.time()
-        p_flat, g_flat = self.compare_pred_gt(p, g, pred, gt)
-        # if max_indices: 
-        if False:
-            """Only sort to a maximum number up to max_indices. Seems faster for sparse either sparse predictions, but 
-            is already super slow for a large number of indices.
-            """
-            arr = np.ma.MaskedArray(p_flat, mask=np.zeros(p_flat.shape, dtype=bool))
-            sorted_indices = []
-            while len(sorted_indices) < max_indices:
-                new_indices = np.ma.where(arr == np.ma.max(arr))[0].tolist()
-                arr.mask[new_indices] = True
-                if randomize_ties: # shuffle if random
-                    np.random.shuffle(new_indices)
-                sorted_indices += new_indices
-        else:
-            if randomize_ties:
-                sorted_indices = argsort_randomize_ties(p_flat)[::-1]
-            else:
-                sorted_indices = p_flat.argsort()[::-1]
-        gt_sorted = g_flat[sorted_indices]
-        cum_tp = np.cumsum(gt_sorted)
-        cum_fp = np.cumsum(np.logical_not(gt_sorted))
-        if self.verbose > 1: print '[CompPredGt][{}] FP TP computed for {} vs {} in {:.2f}s'.format(
-            under_scores_to_camel_case(os.sys._getframe().f_code.co_name), p, g, time.time() - _start_time)
-        return cum_fp, cum_tp # this order for easy unpacking in plot x, y!
 
     @update_mask
     def compute_fp_tp(self, p, g, pred, gt, *args, **kwargs):
@@ -654,433 +544,6 @@ class ComparePredictionGroundtruth(object):
                     precision(est=p_flat, gt=g_flat),
                     recall(est=p_flat, gt=g_flat))
             print'\n'
-
-    ###
-    ### Generalized plots
-    ###
-    def plot_pairs(self, comparison_type, pairs, **kwargs):
-        assert comparison_type in ['tpfp', 'roc', 'pr']
-        print '[CompPredGt] plotting {}...'.format(comparison_type)
-        if comparison_type == 'roc': return self.plot_roc_pairs(pairs, **kwargs)
-        if comparison_type == 'tpfp': return self.plot_tpfp_pairs(pairs, **kwargs)
-        if comparison_type == 'pr': return self.plot_pr_pairs(pairs, **kwargs)
-
-    ### 
-    ### ROC curves
-    ###
-    def plot_roc_curves(self, 
-                        file_prefix=None,
-                        folder=None,
-                        plot_random=False,
-                        drop_intermediate=False,
-                        max_fpr_list='default',
-                        max_per_curve=9):
-        """Plot (partial) ROC curves 
-        
-        Args:
-            file_prefix (None, optional): Description
-            folder (None, optional): Description
-            plot_random (bool, optional): Description
-            drop_intermediate (bool, optional): Description
-            max_fpr_list (str, optional): Description
-            max_per_curve (int, optional): Description
-        """
-        _start_time = time.time()
-        folder = folder or os.path.curdir
-        if not os.path.exists(folder):
-            print '[{0}] creating ROC curve folder {1}'.format(self.__class__.__name__, folder)
-            os.makedirs(folder)
-
-        file_prefix = file_prefix or 'roc'
-
-        # max_per_curve = 7 if max_per_curve is None else max_per_curve
-        if max_fpr_list == 'default': max_fpr_list = self.default_max_fpr_list
-        if max_fpr_list is None: max_fpr_list = []
-
-        fig = plt.figure(figsize=FIGSIZE, dpi=DPI)
-        for g, gt in self.groundtruths_binary():
-            if self.number_predictions_continuous() <= max_per_curve:
-                fig.clf()
-                color_cycle = itertools.cycle(COLOR_CYCLE)
-                for p, pred in self.predictions_continuous():
-                    if self.comparison_exists(p, g):
-                        fpr, tpr, _ = roc_curve(*self.compare_pred_gt(p, g, pred, gt)[::-1], drop_intermediate=drop_intermediate)
-                        plt.plot(fpr, tpr, color=color_cycle.next(), label=r'{}'.format(pred.pretty_name))
-                if plot_random:
-                    for i, p in enumerate(self.random_predictions.keys()):
-                        pred = self.random_predictions[p]
-                        fpr, tpr, _ = roc_curve(*self.compare_pred_gt('_random', g, pred, gt)[::-1])
-                        if i == 0:
-                            plt.plot(fpr, tpr, label='random', alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                        else:
-                            plt.plot(fpr, tpr, alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                else: 
-                    plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6)) # diagonal
-                plt.legend(loc='best', fancybox=True)
-                plt.xlabel('FPR')
-                plt.ylabel('TPR')
-                # Save full range
-                plt.xlim([0, 1.01])
-                plt.ylim([0, 1.01])
-                plt.title('ROC {} {}'.format(g, ''))
-                fig.savefig('{}/{}_{}.pdf'.format(folder, file_prefix, gt.pretty_name), bbox_inches='tight', dpi=DPI)
-                for max_fpr in max_fpr_list:
-                    plt.xlim([0, max_fpr * 1.01])
-                    plt.ylim([0, max_fpr * 1.01])
-                    plt.title('ROC {} (max_fpr={})'.format(g, max_fpr))
-                    fig.savefig('{}/{}_{}_max_fpr{}.pdf'.format(folder, file_prefix, gt.pretty_name, max_fpr), bbox_inches='tight', dpi=DPI)
-            else:
-                current_fig = 1
-                while current_fig < self.number_predictions_continuous() / max_per_curve + 2:
-                    fig.clf()
-                    color_cycle = itertools.cycle(COLOR_CYCLE)
-                    for p in self.predictions_continuous()[max_per_curve * (current_fig - 1): max_per_curve * current_fig]:
-                        if self.comparison_exists(p, g):
-                            fpr, tpr, _ = roc_curve(*self.compare_pred_gt(p, g, pred, gt)[::-1], drop_intermediate=drop_intermediate)
-                            plt.plot(fpr, tpr, color=color_cycle.next(), label=r'{}'.format(pred.pretty_name))
-                    if plot_random:
-                        for i, p in enumerate(self.random_predictions.keys()):
-                            pred = self.random_predictions[p]
-                            fpr, tpr, _ = roc_curve(*self.compare_pred_gt('_random', g, pred, gt)[::-1])
-                            if i == 0:
-                                plt.plot(fpr, tpr, label='random', alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                            else:
-                                plt.plot(fpr, tpr, alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                    else: 
-                        plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6)) # diagonal
-                    plt.legend(loc='best', fancybox=True)
-                    plt.xlabel('FPR')
-                    plt.ylabel('TPR')
-                    # Save full range
-                    plt.xlim([0, 1.01])
-                    plt.ylim([0, 1.01])
-                    plt.title('ROC {} {}'.format(g, ''))
-                    fig.savefig('{}/{}_{}_set{}.pdf'.format(folder, file_prefix, gt.pretty_name, current_fig), bbox_inches='tight', dpi=DPI)
-                    # Save up to maximum fpr
-                    for max_fpr in max_fpr_list:
-                        plt.xlim([0, max_fpr * 1.01])
-                        plt.ylim([0, max_fpr * 1.01])
-                        # plt.title('ROC {} (max_fpr={})'.format(g, max_fpr))
-                        fig.savefig('{}/{}_{}_max_fpr{}_set{}.pdf'.format(folder, file_prefix, gt.pretty_name, max_fpr, current_fig), bbox_inches='tight', dpi=DPI)                    
-                    current_fig += 1
-        plt.close(fig)
-        del fig
-        if self.verbose > 1: print '[CompPredGt][{}] ROC plotted in {:.2f}s'.format(
-            under_scores_to_camel_case(os.sys._getframe().f_code.co_name), time.time() - _start_time)
-
-    ### 
-    ### Precision Recall curves
-    ###
-    def plot_pr_curves(self, 
-                       file_prefix=None,
-                       folder=None,
-                       plot_random=True,
-                       max_tpr_list='default',
-                       max_per_curve=9):
-        """Plot (partial) PR curves 
-        
-        Args:
-            file_prefix (None, optional): Description
-            folder (None, optional): Description
-            plot_random (bool, optional): Description
-            max_tpr_list (str, optional): Description
-            max_per_curve (int, optional): Description
-        """
-        _start_time = time.time()
-        folder = folder or os.path.curdir
-        if not os.path.exists(folder):
-            print '[{0}] creating PR curve folder {1}'.format('CompPredGt', folder)
-            os.makedirs(folder)
-
-        file_prefix = file_prefix or 'pr'
-
-        # max_per_curve = 7 if max_per_curve is None else max_per_curve
-        if max_tpr_list == 'default': max_tpr_list = self.default_max_tpr_list
-        if max_tpr_list is None: max_tpr_list = []
-
-        fig = plt.figure(figsize=FIGSIZE, dpi=DPI)
-        for g, gt in self.groundtruths_binary():
-            if self.number_predictions_continuous() <= max_per_curve:
-                fig.clf()
-                color_cycle = itertools.cycle(COLOR_CYCLE)
-                for p, pred in self.predictions_continuous():
-                    if self.comparison_exists(p, g):
-                        precision, recall, _ = precision_recall_curve(*self.compare_pred_gt(p, g, pred, gt)[::-1])
-                        plt.plot(recall, precision, color=color_cycle.next(), label=r'{}'.format(pred.pretty_name))
-                if plot_random:
-                    for i, p in enumerate(self.random_predictions.keys()):
-                        pred = self.random_predictions[p]
-                        precision, recall, _ = precision_recall_curve(*self.compare_pred_gt('_random', g, pred, gt)[::-1])
-                        if i == 0:
-                            plt.plot(recall, precision, label='random', alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                        else:
-                            plt.plot(recall, precision, alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                plt.legend(loc='best', fancybox=True)
-                plt.xlabel('Recall')
-                plt.ylabel('Precision')
-                # Save full range
-                plt.xlim([0, 1.01])
-                plt.ylim([0, 1.01])
-                plt.title('PR {} {}'.format(g, ''))
-                fig.savefig('{}/{}_{}.pdf'.format(folder, file_prefix, gt.pretty_name), bbox_inches='tight', dpi=DPI)
-                for max_tpr in max_tpr_list:
-                    plt.xlim([0, max_tpr * 1.01])
-                    plt.title('PR {} (max_tpr={})'.format(g, max_tpr))
-                    fig.savefig('{}/{}_{}_max_tpr{}.pdf'.format(folder, file_prefix, gt.pretty_name, max_tpr), bbox_inches='tight', dpi=DPI)
-            else:
-                current_fig = 1
-                while current_fig < self.number_predictions_continuous() / max_per_curve + 2:
-                    fig.clf()
-                    color_cycle = itertools.cycle(COLOR_CYCLE)
-                    for p in self.predictions_continuous[max_per_curve * (current_fig - 1): max_per_curve * current_fig]:
-                        if self.comparison_exists(p, g):
-                            precision, recall, _ = precision_recall_curve(*self.compare_pred_gt(p, g, pred, gt)[::-1])
-                            plt.plot(recall, precision, color=color_cycle.next(), label=r'{}'.format(pred.pretty_name))
-                    if plot_random:
-                        for i, p in enumerate(self.random_predictions.keys()):
-                            pred = self.random_predictions[p]
-                            precision, recall, _ = precision_recall_curve(*self.compare_pred_gt('_random', g, pred, gt)[::-1])
-                            if i == 0:
-                                plt.plot(recall, precision, label='random', alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                            else:
-                                plt.plot(recall, precision, alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                    plt.legend(loc='best', fancybox=True)
-                    plt.xlabel('Recall')
-                    plt.ylabel('Precision')
-                    # Save full range
-                    plt.xlim([0, 1.01])
-                    plt.ylim([0, 1.01])
-                    plt.title('PR {} {}'.format(g, ''))
-                    fig.savefig('{}/{}_{}_set{}.pdf'.format(folder, file_prefix, gt.pretty_name, current_fig), bbox_inches='tight', dpi=DPI)
-                    # Save up to maximum fpr
-                    for max_tpr in max_tpr_list:
-                        plt.xlim([0, max_tpr * 1.01])
-                        # plt.title('PR {} (max_tpr={})'.format(g, max_tpr))
-                        fig.savefig('{}/{}_{}_max_tpr{}_set{}.pdf'.format(folder, file_prefix, gt.pretty_name, max_tpr, current_fig), bbox_inches='tight', dpi=DPI)                    
-                    current_fig += 1
-        plt.close(fig)
-        del fig
-        if self.verbose > 1: print '[CompPredGt][{}] PR plotted in {:.2f}s'.format(
-            under_scores_to_camel_case(os.sys._getframe().f_code.co_name), time.time() - _start_time)
-
-
-    ###
-    ###     TP FP curves
-    ###
-    def plot_tpfp_per_groundtruth(self,
-                                  file_prefix=None,         # prefix on file out
-                                  folder=None,
-                                  max_tp_fp=None,           # iterator of tuple; first one is tp, second fp
-                                  plot_random=True,
-                                  max_per_curve=9):
-        _start_time = time.time()
-        folder = folder or os.path.curdir
-        if not os.path.exists(folder):
-            print '[{0}] creating TP FP curve folder {1}'.format('CompPredGt', folder)
-            os.makedirs(folder)
-
-        file_prefix = file_prefix or 'tpfp'
-
-        # create figure
-        fig = plt.figure(figsize=FIGSIZE, dpi=DPI)
-        for g, gt in self.groundtruths_binary():
-            print '[CompPredGt][{}] plotting TP vs FP for groundtruth'.format(under_scores_to_camel_case(os.sys._getframe().f_code.co_name)), g
-            if self.number_predictions_continuous() <= max_per_curve:
-                fig.clf()
-                color_cycle = itertools.cycle(COLOR_CYCLE)
-                for p, pred in self.predictions_continuous():
-                    if self.comparison_exists(p, g):
-                        plt.plot(*self.compute_fp_tp(p, pred, g, gt), color=color_cycle.next(), linestyle=self.linestyle_tpfp, label=r'{}'.format(pred.pretty_name))
-                # add few random curves
-                if plot_random:
-                    for i, p in enumerate(self.random_predictions.keys()):
-                        # comparison should always exists here!
-                        pred = self.random_predictions[p]
-                        if i == 0:
-                            plt.plot(*self.compute_fp_tp('_random', pred, g, gt), label='random', alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                        else:
-                            plt.plot(*self.compute_fp_tp('_random', pred, g, gt), alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                plt.legend(loc='best', fancybox=True)
-                plt.xlabel('False positives')
-                plt.ylabel('True positives')
-                plt.title('{}'.format(g).capitalize())
-                if max_tp_fp:
-                    for max_tp, max_fp in max_tp_fp:
-                        fig_name = '{}/{}_{}'.format(folder, file_prefix, gt.pretty_name)
-                        plt.xlim(0, max_fp)
-                        fig_name += '_maxfp{}'.format(max_fp)
-                        if max_tp is not None:
-                            plt.ylim([0, max_tp])
-                            fig_name += '_maxtp{}'.format(max_tp)
-                        else:
-                            autoscale_y()
-                        fig.savefig(fig_name + '.pdf', bbox_inches='tight', dpi=DPI)
-                else:
-                    fig.savefig('{}/{}_{}.pdf'.format(folder, file_prefix, gt.pretty_name), bbox_inches='tight', dpi=DPI)
-            else:
-                current_fig = 1
-                while current_fig < self.number_groundtruths_binary() / max_per_curve + 2:
-                    fig.clf()
-                    color_cycle = itertools.cycle(COLOR_CYCLE)
-                    for p, pred in self.predictions_continuous()[max_per_curve * (current_fig - 1): max_per_curve * current_fig]:
-                        if self.comparison_exists(p, g):
-                            plt.plot(*self.compute_fp_tp(p, pred, g, gt), color=color_cycle.next(), linestyle=self.linestyle_tpfp, label=r'{}'.format(pred.pretty_name))    
-                    # add few random curves
-                    if plot_random:
-                        for i, p in enumerate(self.random_predictions.keys()):
-                            # comparison should always exists here!
-                            pred = self.random_predictions[p]
-                            if i == 0:
-                                plt.plot(*self.compute_fp_tp('_random', pred, g, gt), label='random', alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                            else:
-                                plt.plot(*self.compute_fp_tp('_random', pred, g, gt), alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                    plt.legend(loc='best', fancybox=True)
-                    plt.xlabel('False positives')
-                    plt.ylabel('True positives')
-                    plt.title('{} (set {})'.format(g_name, current_fig).capitalize())
-                    if max_tp_fp:
-                        for max_tp, max_fp in max_tp_fp:
-                            fig_name = '{}/{}_{}'.format(folder, file_prefix, gt.pretty_name)
-                            plt.xlim(0, max_fp)
-                            fig_name += '_maxfp{}'.format(max_fp)
-                            if max_tp is not None:
-                                plt.ylim([0, max_tp])
-                                fig_name += '_maxtp{}'.format(max_tp)
-                            else:
-                                autoscale_y()
-                            fig.savefig(fig_name + '_set{}.pdf'.format(current_fig), bbox_inches='tight', dpi=DPI)
-                    else:
-                        fig.savefig('{}/{}_{}_set{}.pdf'.format(folder, file_prefix, gt.pretty_name, current_fig), bbox_inches='tight', dpi=DPI)
-                    current_fig += 1
-        plt.close(fig)
-        del fig
-        if self.verbose > 1: print '[CompPredGt][{}] TP FP pairwise plotted in {:.2f}s'.format(
-            under_scores_to_camel_case(os.sys._getframe().f_code.co_name), time.time() - _start_time)
-
-
-    def plot_tpfp_per_prediction(self, 
-                                 preds=None, 
-                                 preds_labels=None, 
-                                 gts=None, 
-                                 gts_labels=None, 
-                                 file_prefix=None, 
-                                 folder=None,
-                                 max_tp_fp=None, 
-                                 plot_random=True, 
-                                 max_per_curve=9,
-                                 return_fig=False):
-        """Same as plot_tpfp_... but one plot per prediction for all groundtruths
-        
-        Args:
-            preds (list, optional): List of only this set of predictions to use, and order the result in this way.
-            preds_labels (None, optional): Description
-            gts (list, optional): List of only this set of gts to use, and order the result in this way.
-            gts_labels (None, optional): Description
-            file_prefix (None, optional): Description
-            folder (None, optional): Description
-            max_tp_fp (None, optional): Description
-            plot_random (bool, optional): Description
-            max_per_curve (int, optional): Description
-        """
-        _start_time = time.time()
-        folder = folder or os.path.curdir
-        if not os.path.exists(folder):
-            print '[{0}] creating TP FP curve folder {1}'.format('CompPredGt', folder)
-            os.makedirs(folder)
-
-        file_prefix = file_prefix or 'tpfp'
-
-        # create figure
-        fig = plt.figure(figsize=FIGSIZE, dpi=DPI)
-        for p, pred in self.predictions_continuous():
-            if preds:
-                if p not in preds:
-                    continue
-            print '[CompPredGt][{}] plotting TP vs FP for prediction'.format(under_scores_to_camel_case(os.sys._getframe().f_code.co_name)), p
-            if self.number_groundtruths_binary() <= max_per_curve:
-                fig.clf()
-                color_cycle = itertools.cycle(COLOR_CYCLE)
-                for g, gt in self.groundtruths_binary():
-                    if gts:
-                        if g not in gts:
-                            continue
-                    if self.comparison_exists(p, g):
-                        plt.plot(*self.compute_fp_tp(p, pred, g, gt), color=color_cycle.next(), linestyle=self.linestyle_tpfp, label=r'{}'.format(gt.pretty_name))
-                if plot_random:
-                    linestyle = itertools.cycle(LINE_CYCLE)
-                    for thr in self.thresholds:
-                        line_style = line_cycle.next()
-                        # todo, loop over linestyles
-                        for i, g in enumerate(self.random_groundtruths.keys()):
-                            # comparison should always exists here!
-                            gt = self.random_groundtruths[g].make_binary(percentile=thr)
-                            if i == 0:
-                                plt.plot(*self.compute_fp_tp(p, pred, '_random', gt), label='random ({:.2f})'.format(thr), alpha=0.5, linestyle=linestyle, color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                            else:
-                                plt.plot(*self.compute_fp_tp(p, pred, '_random', gt), alpha=0.5, linestyle=line_style, color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                plt.legend(loc='best', fancybox=True)
-                plt.xlabel('False positives')
-                plt.ylabel('True positives')
-                # plt.title('{}'.format(p_name).capitalize())
-                if max_tp_fp:
-                    for max_tp, max_fp in max_tp_fp:
-                        fig_name = '{}/{}_{}'.format(folder, file_prefix, pred.pretty_name)
-                        plt.xlim(0, max_fp)
-                        fig_name += '_maxfp{}'.format(max_fp)
-                        if max_tp is not None:
-                            plt.ylim([0, max_tp])
-                            fig_name += '_maxtp{}'.format(max_tp)
-                        else:
-                            autoscale_y()
-                        fig.savefig(fig_name + '.pdf', bbox_inches='tight', dpi=DPI)
-                else:
-                    fig.savefig('{}/{}_{}.pdf'.format(folder, file_prefix, pred.pretty_name), bbox_inches='tight', dpi=DPI)
-            else:
-                current_fig = 1
-                while current_fig < self.number_groundtruths_binary() / max_per_curve + 2:
-                    fig.clf()
-                    color_cycle = itertools.cycle(COLOR_CYCLE)
-                    for g, gt in self.groundtruths_binary()[max_per_curve * (current_fig - 1): max_per_curve * current_fig]:
-                        if gts:
-                            if g not in gts:
-                                continue
-                        if self.comparison_exists(p, g):
-                            plt.plot(*self.compute_fp_tp(p, pred, g, gt), color=color_cycle.next(), linestyle=self.linestyle_tpfp, label=r'{}'.format(gt.pretty_name))
-                    if plot_random:
-                        line_cycle = itertools.cycle(LINE_CYCLE_RANDOM)
-                        for thr in self.thresholds:
-                            for i, g in enumerate(self.random_groundtruths.keys()):
-                                # comparison should always exists here!
-                                gt = self.random_groundtruths[g].make_binary(percentile=thr)
-                                if i == 0:
-                                    plt.plot(*self.compute_fp_tp(p, pred, '_random', gt), label='random {:.2f}'.format(thr), alpha=0.5, linestyle='dotted', color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                                else:
-                                    plt.plot(*self.compute_fp_tp(p, pred, '_random', gt), alpha=0.5, linestyle=line_cycle.next(), color='{}'.format(0.1 + i * 0.8 / float(len(self.random_predictions) -1 )))
-                    plt.legend(loc='best', fancybox=True)
-                    plt.xlabel('False positives')
-                    plt.ylabel('True positives')
-                    plt.title('{} (set {})'.format(p_name, current_fig).capitalize())
-                    if max_tp_fp:
-                        for max_tp, max_fp in max_tp_fp:
-                            fig_name = '{}/{}_{}'.format(folder, file_prefix, pred.pretty_name)
-                            plt.xlim(0, max_fp)
-                            fig_name += '_maxfp{}'.format(max_fp)
-                            if max_tp is not None:
-                                plt.ylim([0, max_tp])
-                                fig_name += '_maxtp{}'.format(max_tp)
-                            else:
-                                autoscale_y()
-                            fig.savefig(fig_name + '_set{}.pdf'.format(current_fig), bbox_inches='tight', dpi=DPI)
-                    else:
-                        fig.savefig('{}/{}_{}_set{}.pdf'.format(folder, file_prefix, pred.pretty_name, current_fig), bbox_inches='tight', dpi=DPI)
-                    current_fig += 1
-        if return_fig:
-            return fig
-        else:
-            plt.close(fig)
-            del fig
-        if self.verbose > 1: print '[CompPredGt][{}] PR plotted in {:.2f}s'.format(
-            under_scores_to_camel_case(os.sys._getframe().f_code.co_name), time.time() - _start_time)
 
     ### 
     #  AUC
@@ -1342,6 +805,16 @@ class ComparePredictionGroundtruth(object):
             except ValueError:
                 print 'WARNING: SKIPPING TIHGT LAYOUTS DUE TO LARGE LABELS'
             fig.savefig('{}/{}'.format(folder, filename))
+
+    ###
+    ### Generalized plots
+    ###
+    def plot_pairs(self, comparison_type, pairs, **kwargs):
+        assert comparison_type in ['tpfp', 'roc', 'pr']
+        print '[CompPredGt] plotting {}...'.format(comparison_type)
+        if comparison_type == 'roc': return self.plot_roc_pairs(pairs, **kwargs)
+        if comparison_type == 'tpfp': return self.plot_tpfp_pairs(pairs, **kwargs)
+        if comparison_type == 'pr': return self.plot_pr_pairs(pairs, **kwargs)
 
 
     def plot_roc_pairs(self, pairs, lims=None, file_prefix=None, **kwargs):

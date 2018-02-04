@@ -1,4 +1,4 @@
-""" """
+"""Interventional scores computed on microarraydata."""
 from ..microarraydata import MicroArrayData
 from ..libs import CausalArray
 
@@ -76,7 +76,7 @@ def gt_nature(data):
     denominator = np.diag(numerator[:, [data.map_genes[i] for i in data.mutants]])
     return np.abs(np.divide(numerator.T, denominator)).T # transpose for broadcasting... for broadcasting reason
 
-def gt_nature_methods(data): # EXACTLY THE SAME
+def gt_nature_methods(data):
     """Used in nature_methods paper; same as gt_rel_norm but applied on standardized data."""
     a = data.inter_std.T
     means = a.mean(axis=0)    
@@ -86,9 +86,10 @@ def gt_nature_methods(data): # EXACTLY THE SAME
     denominator = np.diag(numerator[:, [data.map_genes[i] for i in data.mutants]])
     return np.abs(np.divide(numerator.T, denominator)).T # transpose for broadcasting... for broadcasting reason
 
-def gt_nature_methods_slow(data):
+def gt_nature_methods_slow(data): 
     """Used in nature_methods paper; same as gt_rel_norm but applied on standardized data.
-         * slow non-vectorized version for checking...
+    
+    Note: slow non-vectorized version.
     """
     a = data.inter_std.T
     means = a.mean(axis=0)
