@@ -14,6 +14,17 @@ from copy import deepcopy
 ########################
 #   MISC
 ########################
+def under_scores_to_camel_case(string):
+    """Transform a string from under score notation to camel case.
+
+    Leaves capitalization in camel case intact
+
+    Examples: 
+        'under_score_word' --> 'UnderScoreWord' is renamed.
+        'CamelCase' --> 'CamelCase' remains invariant.
+    """
+    return ''.join([i[0].capitalize() + i[1:] if len(i) > 1 else i[0].capitalize() for i in string.split('_')])
+
 def is_iter(obj):
     return hasattr(obj, '__iter__')
 
@@ -32,6 +43,17 @@ def argsort_randomize_ties(a, kind='quicksort'):
 
 def get_function_arguments(func):
     return func.func_code.co_varnames[:func.func_code.co_argcount]
+
+def memory_usage_resource():
+    """source: http://fa.bianp.net/blog/2013/different-ways-to-get-memory-consumption-or-lessons-learned-from-memory_profiler/"""
+    import resource
+    rusage_denom = 1024.
+    if os.sys.platform == 'darwin':
+        # ... it seems that in OSX the output is different units ...
+        rusage_denom = rusage_denom * rusage_denom
+        mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / rusage_denom
+        return mem
+
 
 ########################
 #   I/O

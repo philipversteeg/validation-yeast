@@ -10,13 +10,26 @@ class CausalArray(object):
         array (TYPE): Description
         causes (TYPE): Description
         effects (TYPE): Description
-        units (string): Holds the units of measurement (if any) for this CausalArray.
         file (TYPE): Description
         name (TYPE): Description
+        threshold (TYPE): Description
+        units (string): UnitsOfMeasure instance.
     """
     _default_name = 'causalarray'
 
-    def __init__(self, array, causes, effects=None, mask=None, remove_self_loops=None, units=None, file=None, name=None):
+    def __init__(self, array, causes, effects=None, mask=None, remove_self_loops=None, units=None, file=None, name=None, sort=False):
+        """Summary
+        
+        Args:
+            array (TYPE): Description
+            causes (TYPE): Description
+            effects (None, optional): Description
+            mask (None, optional): Description
+            remove_self_loops (None, optional): Description
+            units (None, optional): UnitsOfMeasure object or create one by UnitsOfMeasure(units), default of None corresponds to 'unset'.
+            file (None, optional): Description
+            name (None, optional): Description
+        """
         assert issubclass(type(array), np.ndarray)
         assert issubclass(type(causes), list) # set won't do, unordered... Enforce unique list!
         self.array = array
@@ -30,8 +43,11 @@ class CausalArray(object):
         self.units = units
         self.file = file
         self.name = self._default_name if name is None else name
+        self.pretty_name = None
         if file is not None and not os.path.exists(file): self.save(file)
         # if file is not None: self.save(file)
+        if sort:
+            self._sort_self()
 
 
     @classmethod
@@ -50,7 +66,6 @@ class CausalArray(object):
             effects.sort()
 
         array = np.zeros(shape=(len(causes),len(effects)), dtype=bool)
-        print array.shape
         for i, c in enumerate(causes):
             # print c, len(dictionary[c])
             for e in dictionary[c]:
@@ -91,23 +106,35 @@ class CausalArray(object):
     #     if attr in dir(self.array):
     #         return getattr(self.array, attr)
 
-    # for pickle (because we use __getattr__ to the numpy array)
-    # CAN NOT CHANGE THIS, will result in error in loading saved arrays...
-    # def __getstate__(self):
-    #     return self.__dict__
-
-    # def __setstate__(self, state):
-    #     self.__dict__.update(state)
-
     def _sort_self(self):
         """ Sort causes and effects and the array."""
         sorted_ca, sorted_ef = sorted(self.causes), sorted(self.effects)
-        if not sorted_ca == self.causes:
-            self.array = self.array[sorted_ca,]
-            self.causes = sorted_ca
-        if not sorted_ef == self.effects:
-            self.array = self.array[sorted_ef,]
-            self.effects = sorted_ef
+        if sorted_ca == self.causes: sorted_ca = None
+        if sorted_ef == self.effects: sorted_ef = None
+        self.sort_in_place(ca=sorted_ca, ef=sorted_ef)
+
+    @property
+    def pretty_name(self):
+        if self._pretty_name is not None:
+            return self._pretty_name
+        else:
+            name = self.name
+            if 'threshold' in vars(self):
+                name += ' ({:.2f})'.format(self.threshold)
+            if self.has_units:
+                name += ' [{}]'.format(self.units)
+            return name
+
+    @pretty_name.setter
+    def pretty_name(self, pn=None):
+        self._pretty_name = pn
+
+    @property
+    def binary_name(self):
+        name = self.name
+        if 'threshold' in vars(self):
+            name += '_{:.2f}'.format(self.threshold)
+        return name
 
     def index_causes(self, ca):
         if hasattr(ca, '__iter__'):
@@ -125,37 +152,51 @@ class CausalArray(object):
         if ca:
             assert len(ca) == self.ncauses
             assert all((i in self.causes for i in ca))
-            self.array[self.index_causes(ca=ca) ,:]
+            self.array = self.array[self.index_causes(ca=ca) ,:]
             self.causes=ca
         if ef:
             assert len(ef) == self.neffects
             assert all((i in self.effects for i in ef))
-            self.array[:, self.index_effects(ef=ef)]
+            self.array = self.array[:, self.index_effects(ef=ef)]
             self.effects=ef
 
     def reduce(self, causalarray=None, causes=None, effects=None, name=None, deepcopy=False):
+        """Summary
+        
+        Args:
+            causalarray (None, optional): Description
+            causes (None, optional): Description
+            effects (None, optional): Description
+            name (None, optional): Description
+            deepcopy (bool, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
         if deepcopy:
-            instance = copy.deepcopy(self)
+            _instance = copy.deepcopy(self)
         else:
-            instance = self
+            _instance = self
         if causes is not None: # as 0 can be a single cause identifier.
             if not hasattr(causes, '__iter__'):
                 causes = (causes,)
-            instance.array = instance.array[instance.index_causes(causes), :]
-            instance.causes = causes
+            _instance.array = _instance.array[_instance.index_causes(causes), :]
+            _instance.causes = causes
         if effects is not None:
             if not hasattr(effects, '__iter__'):
                 effects = (effects,)
-            instance.array = instance.array[:, instance.index_effects(effects)]
-            instance.effects = effects
-        # if causalarray is not None:
-        #     causalarray.causes
-        if name: instance.name = name
-        # assert len(instance.causes), len(instance.effects) == instance.array.shape
-        return instance # for easy chaining
+            _instance.array = _instance.array[:, _instance.index_effects(effects)]
+            _instance.effects = effects
+        if name: _instance.name = name
+        return _instance
 
     def add_empty_vars(self, causes=None, effects=None):
-        """Add cause(s) or effect(s) and fill the array at the appropriate indices with zero elements"""        
+        """Add cause(s) or effect(s) and fill the array at the appropriate indices with empty elements
+        
+        Args:
+            causes (None, optional): Description
+            effects (None, optional): Description
+        """
         if causes:
             causes = causes if hasattr(causes, '__iter__') else (causes,) # make sure iterable
             causes = [i for i in causes if not i in self.causes] # only include causes that are not already in self.causes
@@ -170,7 +211,7 @@ class CausalArray(object):
                 self.effects.extend(effects)
 
     ###
-    ### Masked
+    ### Operations returning a masked version.
     ###
     def mask(self, mask):
         self.array = np.ma.masked_array(self.array, mask=mask)
@@ -200,6 +241,7 @@ class CausalArray(object):
         common_ca_ef = set.intersection(set(self.causes), set(self.effects))
         diagonal_mask[[self.causes.index(i) for i in common_ca_ef], [self.effects.index(i) for i in common_ca_ef]] = True
         self.mask(mask=diagonal_mask)
+        return self
 
     def remove_cause_indices(self, indices, strict=True):
         assert hasattr(indices, '__iter__')
@@ -217,16 +259,6 @@ class CausalArray(object):
     #     return dict(zip(self.effects, range(len(self.effects))))
 
     @property
-    def pretty_name(self):
-        if 'pretty_name' in vars(self):
-            return self.pretty_name
-        else:
-            if 'threshold' in vars(self):
-                return '{} ({})'.format(self.name, int(self.threshold))
-            else:
-                return self.name
-
-    @property
     def ncauses(self):
         return len(self.causes)
 
@@ -234,6 +266,13 @@ class CausalArray(object):
     def neffects(self):
         return len(self.effects)
     
+    @property
+    def ncausaleffects(self):
+        if self.masked:
+            return self.array.size - self.array.mask.sum()
+        else:
+            return self.array.size
+
     @property
     def num_nonzero(self):
         """Number of nonzero edges in (masked) array.
@@ -252,9 +291,9 @@ class CausalArray(object):
     @property
     def num_zero(self):
         if self.binary:
-            return np.sum(self.array == False)
+            return self.array.size - np.sum(self.array)
         else:
-            return np.sum(self.array == 0)
+            return self.array.size - np.sum(self.array != 0)
 
     @property
     def zero(self):
@@ -262,7 +301,7 @@ class CausalArray(object):
 
     @property
     def binary(self):
-        return self.array.dtype == bool
+        return self.array.dtype is bool or self.array.dtype == np.bool_ # needed as some GT's loaded from disk are a different boolean type.
     
     @property
     def is_binary(self):
@@ -291,27 +330,60 @@ class CausalArray(object):
     def has_units_not_none(self):
         return self.units.is_not_none
 
-    @units.setter
-    def units(self, obj):
-        if issubclass(type(obj), UnitsOfMeasure): self._units = obj
-        else: self._units = UnitsOfMeasure(obj)
-
     @property
     def units(self):
         return self._units
 
-    def normalize_units(self, compare_causalarray, scale_units):
-        # first build array from scale_units
+    @units.setter
+    def units(self, obj):
+        if type(obj).__name__ == UnitsOfMeasure.__name__: self._units = obj
+        else: self._units = UnitsOfMeasure(obj)
+
+    def normalize_units_array(self, compare_with, scale_units):
+        """Return a numpy array that is rescaled according to compare_causalarray using scale_units
+        
+        Args:
+            compare_with (CausalArray, UnitsOfMeasure or str): units to compare with
+            scale_units (Dict): dictionary containing the scale parameters for the units
+        
+        Returns:
+            TYPE: Description
+        """
         std_ca = np.array([scale_units[i] for i in self.causes])
         std_ef = np.array([scale_units[i] for i in self.effects])
         # rescale the array
-        print self.name
-        num_ca, num_ef = diff_unit_of_measure(compare_causalarray, self)
-        if num_ca != 0:
-            self.array = self.array * np.power(np.column_stack(self.neffects * [std_ca,]), num_ca)
-        if num_ef != 0:
-            self.array = self.array * np.power(np.row_stack(self.ncauses * [std_ef,]), num_ef)
-        return self
+        num_ca, num_ef = diff_unit_of_measure(compare_with, self)
+        # faster implementation..
+        if num_ca != 0 and num_ef != 0:
+            return self.array * np.power(np.column_stack(self.neffects * [std_ca,]), float(num_ca)) * np.power(np.row_stack(self.ncauses * [std_ef,]), float(num_ef))
+        elif num_ca == 0 and num_ef != 0:
+            return self.array * np.power(np.row_stack(self.ncauses * [std_ef,]), float(num_ef))
+        elif num_ca != 0 and num_ef == 0:
+            return self.array * np.power(np.column_stack(self.neffects * [std_ca,]), float(num_ca))
+        else:
+            return self.array
+
+    def normalize_units(self, compare_with, scale_units, deepcopy=False):
+        """Normalize units of array and copy to return a new instance.
+        
+        Args:
+            compare_with (CausalArray, UnitsOfMeasure or str): Units to compare with
+            scale_units (Dict): Dictionary containing the scale parameters for the units
+            deepcopy (bool, optional): Return a new copy of the instance, with the transformed units
+        
+        Returns:
+            TYPE: Self object
+        """
+        if deepcopy:
+            _instance = copy.deepcopy(self)
+        else:
+            _instance = self
+        _instance.array = _instance.normalize_units_array(compare_with=compare_with, scale_units=scale_units)
+        if type(compare_with).__name__ is CausalArray.__name__:
+            _instance.units = UnitsOfMeasure(compare_with._units)
+        else:
+            _instance.units = copy.deepcopy(compare_with)
+        return _instance
 
     def make_binary(self, percentile, strict=True):
         # print 'calling', self.name, 'make binary with value:', percentile 
@@ -353,6 +425,18 @@ class CausalArray(object):
             if self.units.is_not_none:
                 fid.create_dataset('/units', data=self.units._unitstring)
             fid.create_dataset('/name', data=self.name)
+        # with h5py.File(file, 'w') as fid:
+        #     fid.create_dataset('/array', data=self.array, compression=compression)
+        #     fid.create_dataset('/causes', data=self.causes, compression=compression)
+        #     fid.create_dataset('/effects', data=self.effects, compression=compression)
+        #     fid.create_dataset('/name', data=self.name)
+        # perhapse the problem is single-writer-multiple-reader mode? See http://docs.h5py.org/en/latest/swmr.html.
+        # with h5py.File(file, 'w', libver='latest') as fid:
+        #     fid.create_dataset('/array', data=self.array, compression=compression)
+        #     fid.create_dataset('/causes', data=self.causes, compression=compression)
+        #     fid.create_dataset('/effects', data=self.effects, compression=compression)
+        #     fid.create_dataset('/name', data=self.name)
+        #     fid.swmr_mode = True
 
     @classmethod
     def load(cls, file, verbose=False):
@@ -374,7 +458,7 @@ class CausalArray(object):
                         unitstring = None
                 # fid.close()
             except IOError as e:
-                print 'Error when opening file', file
+                print 'Error when opening file %s' % file
                 raise IOError(e)
         else:
             raise IOError('{0} could not be loaded'.format(file))
@@ -450,7 +534,8 @@ def test_array(ncauses=None, neffects=None):
 
 
 class UnitsOfMeasure(object):
-    """Holds units of measure in terms of [cause] and [effect]
+    """Holds units of measure for a causalarray in factors of [cause] and [effect].
+    
     Can have one of several different values:
         0 :: unknown
         1 :: (physical) unitless
@@ -519,7 +604,6 @@ class UnitsOfMeasure(object):
 
 class UnknownUnits(Exception):
     """Exception for unknown units when attempting a unit conversion."""
-    pass
 
 class ZeroCausalArray(Exception):
     """Exception for a zero set of predictions or groundtruths."""
@@ -539,11 +623,32 @@ def diff_unit_of_measure(x, y):
     Returns:
         (int, int): Tuple of a,b, difference in units.
     """
-    if issubclass(type(x), CausalArray): x = x.units
-    if issubclass(type(y), CausalArray): y = y.units
+    try:
+        xunits = x.units
+    except AttributeError:
+        if type(x) is str:
+            xunits = UnitsOfMeasure(x)
+        else:
+            xunits = x
+    try:
+        yunits = y.units
+    except AttributeError:
+        if type(y) is str:
+            yunits = UnitsOfMeasure(y)
+        else:
+            yunits = y
     # print type(x)
     # assert issubclass(type(x), UnitsOfMeasure)
     # assert issubclass(type(y), UnitsOfMeasure)
-    if x._unitstring is None or x._unitstring == '0' or y._unitstring is None or y._unitstring == '0':
-        raise UnknownUnits()
-    return x._i - y._i, x._j - y._j
+    if xunits._unitstring is None or xunits._unitstring == '0':
+        if issubclass(type(x), CausalArray):
+            raise UnknownUnits('Unknown unit found for %s' % x.name)
+        else:
+            raise UnknownUnits('Unknown unit found')
+    if yunits._unitstring is None or yunits._unitstring == '0':
+        if issubclass(type(x), CausalArray):
+            raise UnknownUnits('Unknown unit found for %s' % y.name)
+        else:
+            raise UnknownUnits('Unknown unit found')
+    return xunits._i - yunits._i, xunits._j - yunits._j
+
