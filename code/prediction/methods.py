@@ -11,14 +11,11 @@ import numpy as np
 from scipy.stats import kendalltau, spearmanr
 from scipy.spatial.distance import correlation as distancecorr
 
-# other packages
+# local
 from ..microarraydata import MicroArrayData
 from ..libs import CausalArray
 from ..libs.misc import save_array, load_array
-# from libs import MicroArrayData
-
-# local
-import config
+from .. import config
 
 OBSERMETHOD_DATATYPES = ['obser', 'inter', 'obser_inter_joint']
 

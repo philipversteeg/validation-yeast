@@ -25,11 +25,11 @@ import matplotlib.patches as mpatches
 from matplotlib import ticker
 
 # local
-os.sys.path.insert(0, '../libs')
+import config
 from microarraydata import Kemmeren # for testing only
-from causallib import CausalArray, ZeroCausalArray,  convert_to_binary, UnitsOfMeasure, intersect_causalarrays
-from misc import risk_estimate, precision, recall, argsort_randomize_ties, under_scores_to_camel_case, memory_usage_resource
-from ranking_pauc import roc_auc_score # includes the patchfor the partial AUC.
+from libs.causallib import CausalArray, ZeroCausalArray,  convert_to_binary, UnitsOfMeasure, intersect_causalarrays
+from libs.misc import risk_estimate, precision, recall, argsort_randomize_ties, under_scores_to_camel_case, memory_usage_resource
+from libs.ranking_pauc import roc_auc_score # includes the patch for the partial AUC.
 
 COMPARE_SETTINGS = ['intersection', 'pairwise']
 SERVER = os.sys.platform != 'darwin' # true if on linux or windows

@@ -1,4 +1,4 @@
-# Code and package for predicting and validating causal effects from microarraydata.
+# Predicting and validating causal effects from microarraydata.
 
 ## Files and folders:
 * code -- package with prediction and validation code

@@ -1,4 +1,6 @@
+import config
 import libs
 import microarraydata
 import prediction
 import groundtruth
+from compare_prediction_groundtruth import ComparePredictionGroundtruth

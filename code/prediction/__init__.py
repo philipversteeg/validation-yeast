@@ -1,6 +1,3 @@
-import config               # singleton settings file with default parameters and folder setup 
-import scripts
-
 ## methods
 import methods
 from methods import *       # quick access

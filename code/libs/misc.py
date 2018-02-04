@@ -9,10 +9,7 @@ import math
 from scipy import linalg
 from scipy.stats import t
 from scipy.sparse import csr_matrix
-# import matplotlib.pyplot as plt
 from copy import deepcopy
-
-FOLDER_DATA = '../data'
 
 ########################
 #   MISC

@@ -2,8 +2,6 @@
 import os
 import math
 import time
-
-# concurrency
 from threading import Thread
 from Queue import Queue as ThreadQueue
 from multiprocessing import Process, Semaphore, cpu_count, Queue as ProcessQueue
@@ -11,7 +9,7 @@ from multiprocessing import Process, Semaphore, cpu_count, Queue as ProcessQueue
 # local
 from .methods import Predictor
 from ..microarraydata import MicroArrayData
-import config
+from .. import config
 
 #############################
 #   Parallelize             #
