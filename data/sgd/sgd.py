@@ -1,3 +1,4 @@
+"""Query SGD to create a groundtruth and a unique gene mapping using secondary identifiers. """
 # std
 import os
 import time
@@ -8,13 +9,10 @@ import numpy as np
 from intermine.webservice import Service
 
 # custom
-from ..libs import CausalArray, read_datestamp_hdf5, write_datestamp_hdf5
-from .. import config
+os.sys.path.append('../../code')
+from libs import CausalArray
 
-# folder
-# folder_sgd = os.path.abspath('{}/../data/sgd'.format(os.path.dirname(__file__)
-#     if os.path.dirname(__file__) != '' else '.'))
-folder_sgd = config.folder_data + '/sgd'
+folder_sgd = '.'
 
 # files naming
 filename_map_all = folder_sgd + '/' + 'map_all_to_systematic.json'
@@ -277,6 +275,9 @@ def gene_mapping(gene_list=None, only_standard=False, strict=True, verbose=False
     Returns:
         Dict or list of renamed genes if gene_list is not None.
     """
+    if not os.path.exists(filename_map_std):
+        make_gene_mapping()
+
     with open(filename_map_std if only_standard else filename_map_all) as f:
         sgd_mapping = json.load(f)
         # unicode mapping... convert to uppercase string
@@ -300,7 +301,7 @@ def gene_mapping(gene_list=None, only_standard=False, strict=True, verbose=False
             print 'RENAMED: {} --> {}'.format(i,j)
     return result
 
-# quick access of complete dict
+# quick acces dict
 mapping = gene_mapping()
 
 if __name__ == '__main__':

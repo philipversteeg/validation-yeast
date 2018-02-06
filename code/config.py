@@ -17,9 +17,10 @@ _folder_prediction = _folder_package + '/prediction'
 _folder_extern_R = _folder_prediction + '/extern/R'             # external R folder
 
 ## Project folders 
-folder = '..'                                                   # base folder for computation
-folder_test = folder + '/test'                                  # containts (unit)tests and output
-folder_results = folder + '/results'                             # result base folder
+folder = '..'                                                   # base project folder
+folder_test = folder + '/test'                                  # fodler with (unit)tests and output
+folder_data = folder + '/data'                                  # data folder 
+folder_results = folder + '/results'                            # result base folder
 # create folders if not exists
 if not os.path.exists(folder_results): os.makedirs(folder_results)
 
