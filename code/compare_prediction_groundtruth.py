@@ -67,18 +67,22 @@ def compute_auc_bootstrap(p, g, nbootstraps, max_fpr=None, nprocesses=None):
     nprocesses = nprocesses or 36 if SERVER else 2
     # array_bootstraps = Queue() # processafe
     pool = Pool(nprocesses)
-    process_list = [pool.apply_async(func=compute_one_bootstrap, kwds={'p':p, 'g':g, 'max_fpr':max_fpr}) for i in range(nbootstraps)]
+    process_list = [pool.apply_async(func=compute_one_bootstrap, kwds={'p':p, 'g':g, 'seed':i, 'max_fpr':max_fpr}) for i in range(nbootstraps)]
     pool.close()
     pool.join()
     array_bootstraps = np.array([i.get() for i in process_list])
     return array_bootstraps
 
-def compute_one_bootstrap(p, g, max_fpr):
-    _start_bootstrap = time.time()
-    score = roc_auc_score(
-        np.random.choice(g, size=g.size, replace=True),
-        np.random.choice(p, size=p.size, replace=True),
-        max_fpr=max_fpr)
+def compute_one_bootstrap(p, g, seed, max_fpr):
+    """Compute AUC statistic for one bootstrap
+
+    Note that we need to pass a unique seed to specify a specific local numpy random state,
+    otherwise all forked processes result in the same bootstrap sample.
+    """
+    # _start_bootstrap = time.time()
+    local_random_state = np.random.RandomState(seed)
+    sample_index = local_random_state.choice(range(g.size), size=g.size, replace=True)
+    score = roc_auc_score(g[sample_index], p[sample_index], max_fpr=max_fpr)
     # print 'Done in {:.2f}s.'.format(time.time() - _start_bootstrap) 
     return score
 
@@ -555,7 +559,8 @@ class ComparePredictionGroundtruth(object):
             folder=None,
             save_auc=False,      # if not none, save auc and bootstraps
             load_auc=False,      # if true, load from available auc file if available
-            nbootstraps=None,
+            nbootstraps=None,    # number of bootstraps, set to i.e. 1000
+            nprocesses=None,     # number of processes for estimating the AUC bootstraps
             print_out=False):
         """Compute (partial) AUCs for each prediction and groundtruth
         
@@ -577,21 +582,28 @@ class ComparePredictionGroundtruth(object):
             nbootstraps > 0
                 (2darray, 2darray, list, list): Tuple of AUC (row: groundtruths x cols: predictions), predictions, groundtruths     
         """
+        # setup folders if necessary
+        if nbootstraps: 
+            save_auc = True # always save bootstraps
+            load_auc = True
         if save_auc or load_auc:
             if folder is None:
-                raise Exception('Specify a folder to save to!')
+                folder = os.path.curdir
+                print '[CompPredGt][{}] WARNING: no folder specified, using \'{}\' to save AUC results to.'.format(under_scores_to_camel_case(os.sys._getframe().f_code.co_name), folder)
         save_auc_folder = 'auc_buffer'
         if save_auc:
             if not os.path.exists(folder + '/' + save_auc_folder):
                 os.makedirs(folder + '/' + save_auc_folder)
-
+        
+        # setup arrays
+        g_ids = [] # g unique identifiers
+        p_ids = [] # p unique identifiers
         auc_array = np.empty(shape=(self.number_predictions_continuous(ps=ps), self.number_groundtruths_binary(gs=gs)))
         print '[CompPredGt][{}] Computing AUC with {} predictions and {} groundtruths'.format(
             under_scores_to_camel_case(os.sys._getframe().f_code.co_name), auc_array.shape[0], auc_array.shape[1])
         auc_array[:] = np.nan
-        g_ids = [] # g unique identifiers
-        p_ids = [] # p unique identifiers
-        # fill array
+        
+        # compute auc
         for g_index, (g, gt) in enumerate(self.groundtruths_binary(gs=gs)):
             g_ids.append(g) # to preserve order
             for p_index, (p, pred) in enumerate(self.predictions_continuous(ps=ps)):
@@ -613,15 +625,12 @@ class ComparePredictionGroundtruth(object):
                                 os.makedirs(p_g_folder)
                             with h5py.File(p_g_folder + '/auc.hdf5', 'w') as fid:
                                 fid.create_dataset('auc', data=auc_array[p_index, g_index])
-        # bootstrap, perform them afterwards and seperately
+        # bootstraps for conf ints
         if nbootstraps > 0:
             auc_array_bootstraps = np.empty(shape=(self.number_predictions_continuous(ps=ps), self.number_groundtruths_binary(gs=gs), nbootstraps))
             conf_ints =  np.empty(shape=(self.number_predictions_continuous(ps=ps), self.number_groundtruths_binary(gs=gs)))
             for g_index, (g, gt) in enumerate(self.groundtruths_binary(gs=gs)):
-                g_ids.append(g) # to preserve order
                 for p_index, (p, pred) in enumerate(self.predictions_continuous(ps=ps)):
-                    if g_index == 0: # only fill names once!
-                        p_ids.append(p)
                     if self.comparison_exists(p, g):
                         compute_this_pair = True
                         if load_auc:
@@ -634,7 +643,7 @@ class ComparePredictionGroundtruth(object):
                         if compute_this_pair:
                             p_flat, g_flat = self.compare_pred_gt(p, g, pred, gt)
                             _start_bootstrap = time.time()
-                            auc_array_bootstraps[p_index, g_index, :] = compute_auc_bootstrap(p=p_flat, g=g_flat, nbootstraps=nbootstraps, max_fpr=max_fpr)
+                            auc_array_bootstraps[p_index, g_index, :] = compute_auc_bootstrap(p=p_flat, g=g_flat, nbootstraps=nbootstraps, max_fpr=max_fpr, nprocesses=nprocesses)
                             print '[CompPredGt][{}] Bootstrapped AUC for {} vs {} done. ({:.2f}sec.)'.format(under_scores_to_camel_case(os.sys._getframe().f_code.co_name), gt.binary_name, p, time.time() - _start_bootstrap)
                             if save_auc or load_auc:
                                 p_g_folder = folder + '/' + save_auc_folder + '/' + gt.binary_name + '/' + p
@@ -642,34 +651,21 @@ class ComparePredictionGroundtruth(object):
                                     os.makedirs(p_g_folder)
                                 with h5py.File(p_g_folder + '/auc_bootstraps.hdf5', 'w') as fid:
                                     fid.create_dataset('auc_bootstraps', data=auc_array_bootstraps[p_index, g_index,:])
-                        auc_array[p_index, g_index] = roc_auc_score(*self.compare_pred_gt(p, g, pred, gt)[::-1], max_fpr=max_fpr)
-                    # if self.comparison_exists(p, g):
-                    #     p_flat, g_flat = self.compare_pred_gt(p, g, pred, gt)
-                    #     _start_bootstrap = time.time()
-                    #     auc_array_bootstraps[p_index, g_index, :] = compute_auc_bootstrap(p=p_flat, g=g_flat, nbootstraps=nbootstraps, max_fpr=max_fpr)
-                    #     print '[CompPredGt][{}] Bootstrapped AUC for {} vs {} done. ({:.2f}sec.)'.format(under_scores_to_camel_case(os.sys._getframe().f_code.co_name), gt.binary_name, p, time.time() - _start_bootstrap)
-                    #     if save_auc:
-                    #         p_g_folder = folder + '/' + save_auc_folder + '/' + gt.binary_name + '/' + p
-                    #         with h5py.File(p_g_folder + '/auc_bootstraps.hdf5', 'w') as fid:
-                    #             fid.create_dataset('auc_bootstraps', data=auc_array_bootstraps[p_index, g_index,:])
-                    #     # compute the 2 SD's from the estimate above:
-                    #     conf_ints[p_index, g_index] = 2 * np.sqrt(np.sum((auc_array_bootstraps[p_index, g_index, :] - auc_array[p_index, g_index])**2) / float(nbootstraps))
+                        # method 1: conf ints in two different ways wrt to point estimate AUC
+                        # conf_ints[p_index, g_index] = 2 * np.sqrt(np.sum((auc_array_bootstraps[p_index, g_index, :] - auc_array[p_index, g_index])**2) / float(nbootstraps))
+                        # method 1: conf ints in two different ways wrt to bootstrap mean AUC
+                        conf_ints[p_index, g_index] = 2 * auc_array_bootstraps[p_index, g_index, :].std() 
+        # print
         if print_out:
-            print '\n\tAUC\t{:12s}\t{}'.format(' ' if max_fpr is None else 'm={}'.format(max_fpr),''.join(['{:14s}'.format(g_name) for g_name in g_ids]))
-            for p_index, p_name in enumerate(p_ids):
-                print '\t{:16s}\t{}'.format(p_name,''.join(['{:.2f}{:10s}'.format(auc_array[p_index, g_id], '') for g_id in range(len(g_ids))]))
-        # save auc and bootstraps
-        # for g_index, (g, gt) in enumerate(self.groundtruths_binary(gs=gs)):
-        #     for p_index, (p, pred) in enumerate(self.predictions_continuous(ps=ps)):
-        #         if save_auc:
-        #             p_g_folder = folder + '/' + save_auc_folder + '/' + g + '/' + p
-        #             if not os.path.exists(p_g_folder):
-        #                 os.makedirs(p_g_folder)
-        #             with h5py.File(p_g_folder + '/auc.hdf5', 'w') as fid:
-        #                 fid.create_dataset('auc', data=auc_array[p_index, g_index])
-        #             if nbootstraps > 0:
-        #                 with h5py.File(p_g_folder + '/auc_bootstraps.hdf5', 'w') as fid:
-        #                     fid.create_dataset('auc_bootstraps', data=auc_array_bootstraps[p_index, g_index,:])
+            if nbootstraps > 0:
+                print '\n\tAUC {:12s}\t{}'.format(' ' if max_fpr is None else 'm={}'.format(max_fpr),''.join(['{:17s}'.format(g_name) for g_name in g_ids]))
+                for p_index, p_name in enumerate(p_ids):
+                    print '\t{:16s}\t{}'.format(p_name,''.join(['{:.2f} +/-{:.2f} {:4s}'.format(auc_array[p_index, g_id], conf_ints[p_index, g_id], '') for g_id in range(len(g_ids))]))
+            else:
+                print '\n\tAUC {:12s}\t{}'.format(' ' if max_fpr is None else 'm={}'.format(max_fpr),''.join(['{:14s}'.format(g_name) for g_name in g_ids]))
+                for p_index, p_name in enumerate(p_ids):
+                    print '\t{:16s}\t{}'.format(p_name,''.join(['{:.2f}{:10s}'.format(auc_array[p_index, g_id], '') for g_id in range(len(g_ids))]))
+        # return
         if nbootstraps:
             return auc_array, conf_ints, ps or self.predictions_continuous_available, gs or self.groundtruths_binary_available
         else:
