@@ -15,8 +15,7 @@ from libs import CausalArray
 folder_sgd = '.'
 
 # files naming
-filename_map_all = folder_sgd + '/' + 'map_all_to_systematic.json'
-filename_map_std = folder_sgd + '/' + 'map_standard_to_systematic.json'
+sgd_mapping_file = folder_sgd + '/' + 'sgd_naming.json'
 _filename_duplicates = folder_sgd + '/' + '.duplicates.json'
 
 # files groundtruth
@@ -248,9 +247,9 @@ def make_gene_mapping(add_self_maps=True, verbose=True):
         print 'Total map size:', len(set(map_all_to_systematic.keys()))
         print 'Duplicates:', len(set(synonym_duplicates.keys()))
 
-    with open(filename_map_all, 'w') as f:
+    with open(sgd_mapping_file, 'w') as f:
         json.dump(map_all_to_systematic, f)
-    with open(filename_map_std, 'w') as f:
+    with open(sgd_mapping_file, 'w') as f:
         json.dump(map_standard_to_systematic, f)
     
     temp_ = {}
@@ -264,21 +263,23 @@ def make_gene_mapping(add_self_maps=True, verbose=True):
     if verbose: print 'Time:', time.time() - start_time
 
 
-def gene_mapping(gene_list=None, only_standard=False, strict=True, verbose=False):
+def gene_mapping(gene_list=None, verbose=False):
     """Uniquely map from gene aliasses onto second identifier
     
     Args:
         gene_list (None, optional): Description
-        only_standard (bool, optional): Description
         verbose (bool, optional): Description
     
     Returns:
         Dict or list of renamed genes if gene_list is not None.
+    
+    Deleted Parameters:
+        only_standard (bool, optional): Description
     """
-    if not os.path.exists(filename_map_std):
+    if not os.path.exists(sgd_mapping_file):
         make_gene_mapping()
 
-    with open(filename_map_std if only_standard else filename_map_all) as f:
+    with open(sgd_mapping_file, 'r') as f:
         sgd_mapping = json.load(f)
         # unicode mapping... convert to uppercase string
         sgd_mapping = dict((i.encode('ascii').upper(),j.encode('ascii').upper()) for i,j in sgd_mapping.items()) 
@@ -304,9 +305,9 @@ def gene_mapping(gene_list=None, only_standard=False, strict=True, verbose=False
 # quick acces dict
 mapping = gene_mapping()
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
     
-    make_all_groundtruths()
+    # make_all_groundtruths()
     
     # for type in ('genetic', 'physical', 'all'):
     #     for curated in [True, False]:
