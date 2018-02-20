@@ -1,7 +1,9 @@
 # Predicting and validating causal effects from microarraydata.
 
 ## Install
-Run install.sh to setup all required R and Python-2.7 packages.
+Warning: work in progress, not yet fully installable!
+
+Run install.sh to setup all required R and Python-2.7 packages, download all data and preprocess it.
 
 ## Organization
 * code -- package with prediction and validation code

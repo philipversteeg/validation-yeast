@@ -177,7 +177,7 @@ class ComparePredictionGroundtruth(object):
         # print self
 
     def __repr__(self):
-        return 'Predcitions:\n{}\n\nGroundtruths:\n{}'.format('\t'.join(self._predictions.keys()), '\t'.join(self._groundtruths.keys()))
+        return 'Predictions:\n{}\n\nGroundtruths:\n{}'.format('\t'.join(self._predictions.keys()), '\t'.join(self._groundtruths.keys()))
 
     def add_gt(self, gt):
         """Add a prediction CausalArray or dictionary of CausalArrays."""

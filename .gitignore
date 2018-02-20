@@ -15,6 +15,12 @@
 *.bcf
 *.xml
 
+# Data
+*.txt
+*.xls
+*.doc
+*.pcl
+
 # Python
 *.pyc
 *.ipynb
@@ -41,6 +47,8 @@ Icon^M
 
 # Misc
 *.zip
+*.tar
+*.tar.gz
 *.ini
 *.dropbox
 
